@@ -21,7 +21,25 @@ A powerful, asynchronous Telegram bot built with **aiogram 3** that simplifies d
 
 ---
 
-## 🚀 Deployment Guide
+## ☁️ Deploy to Render
+
+1. **Fork/Push** this repository to your GitHub.
+2. Log in to [Render](https://render.com/).
+3. Click **New +** > **Web Service**.
+4. Connect your GitHub repository.
+5. **Configuration**:
+   - **Runtime**: `Docker` (Recommended) or `Python`.
+   - **Environment Variables**:
+     - `BOT_TOKEN`: Your Telegram Bot Token.
+     - `PORT`: `8080` (Standard for the health check).
+6. Click **Deploy**.
+
+> [!TIP]
+> Use the **Docker** runtime on Render to ensure FFmpeg is automatically installed and configured.
+
+---
+
+## 🚀 Deployment Guide (Manual)
 
 ### 1. Prerequisites
 - **Python 3.11+** installed on your system.

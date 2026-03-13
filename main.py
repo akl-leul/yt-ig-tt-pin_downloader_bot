@@ -15,6 +15,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.telegram import TelegramAPIServer
 from aiogram.enums import ParseMode
+from aiohttp import web
 from aiogram.filters import Command
 from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
 import yt_dlp
@@ -769,6 +770,23 @@ async def handle_inline_query(inline_query: types.InlineQuery):
         await inline_query.answer([result], cache_time=1)
 
 
+async def handle_health(request):
+    """Simple health-check endpoint for Render"""
+    return web.Response(text="OK", status=200)
+
+async def start_health_server():
+    """Start a lightweight web server for Render health checks"""
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    app.router.add_get("/health", handle_health)
+    
+    port = int(os.getenv("PORT", 8080))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    logger.info(f"Starting health check server on port {port}...")
+    await site.start()
+
 async def main():
     """Main function to start the bot"""
     logger.info("Starting YouTube Downloader Bot...")
@@ -782,6 +800,10 @@ async def main():
             except Exception as e:
                 logger.error(f"Error cleaning up {file}: {e}")
     
+    # Start health check server if on Render or configured
+    if os.getenv("PORT") or os.getenv("RENDER"):
+        asyncio.create_task(start_health_server())
+
     # Start polling
     await dp.start_polling(bot)
 

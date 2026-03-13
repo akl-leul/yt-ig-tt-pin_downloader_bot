@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.telegram import TelegramAPIServer
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import InlineQueryResultArticle, InputTextMessageContent
@@ -27,17 +28,19 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-MAX_FILE_SIZE_MB = 50  # Telegram's standard bot upload limit
-MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-DOWNLOADS_DIR = Path("downloads")
-DOWNLOADS_DIR.mkdir(exist_ok=True)
-
-# Bot token - set this environment variable
+# Bot configuration
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+API_SERVER_URL = os.getenv("TELEGRAM_API_URL") # For Local Bot API Server support (up to 2GB)
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN environment variable is not set!")
+
+# Constants - Dynamic based on API Server
+IS_LOCAL_API = bool(API_SERVER_URL)
+MAX_FILE_SIZE_MB = 2000 if IS_LOCAL_API else 50 # Local API supports up to 2GB, Cloud API 50MB
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+DOWNLOADS_DIR = Path("downloads")
+DOWNLOADS_DIR.mkdir(exist_ok=True)
 
 # URL Patterns
 YOUTUBE_URL_PATTERN = re.compile(
@@ -296,11 +299,22 @@ class YouTubeDownloader:
 # Initialize downloader
 downloader = YouTubeDownloader()
 
-# Initialize bot and dispatcher
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-)
+# Initialize bot with Local Bot API support if configured
+bot_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
+if IS_LOCAL_API:
+    logger.info(f"Using Local Bot API Server: {API_SERVER_URL}")
+    bot = Bot(
+        token=BOT_TOKEN,
+        default=bot_properties,
+        session=aiohttp.ClientSession(), # Required for custom server in some versions
+        server=TelegramAPIServer.from_base(API_SERVER_URL)
+    )
+else:
+    bot = Bot(
+        token=BOT_TOKEN,
+        default=bot_properties
+    )
+
 dp = Dispatcher()
 
 

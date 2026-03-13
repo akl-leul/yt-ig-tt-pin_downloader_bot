@@ -70,7 +70,22 @@ python main.py
 - **Framework**: `aiogram` (v3.x) for the Telegram interface.
 - **Extraction**: `yt-dlp` for YouTube/General, `instaloader` for Instagram, `tiktok_downloader` for TikTok.
 - **Storage**: Temporary files are stored in `./downloads` and purged immediately after the upload is finished.
-- **Size Limits**: Automatically detects if a file exceeds Telegram's **50MB** limit. It will fallback to lower resolutions (e.g., 480p) to try and stay within the limit.
+- **Size Limits**: Automatically detects if a file exceeds Telegram's limit.
+  - **Standard**: 50MB (using Telegram's cloud servers).
+  - **Premium/Advanced**: Up to **2000MB (2GB)** by using a [Local Bot API Server](https://core.telegram.org/bots/api#using-a-local-bot-api-server).
+
+---
+
+## 🔝 Bypassing the 50MB Limit (2GB Uploads)
+
+To send files up to 2GB, you must run your own Telegram Bot API server:
+
+1. Setup a [Local Bot API Server](https://github.com/tdlib/telegram-bot-api).
+2. Add the following to your `.env` file:
+   ```env
+   TELEGRAM_API_URL=http://localhost:8081
+   ```
+3. The bot will automatically detect the server and increase the limit to 2000MB.
 
 ---
 

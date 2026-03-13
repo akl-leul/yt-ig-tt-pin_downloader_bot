@@ -366,11 +366,11 @@ async def handle_text_message(message: types.Message):
             video_id = YOUTUBE_URL_PATTERN.search(url).group(6)
             keyboard = [
                 [
-                    types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql_{video_id}_360"),
-                    types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql_{video_id}_480")
+                    types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql|{video_id}|360"),
+                    types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql|{video_id}|480")
                 ],
                 [
-                    types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql_{video_id}_720")
+                    types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql|{video_id}|720")
                 ]
             ]
             reply_markup = types.InlineKeyboardMarkup(inline_keyboard=keyboard)
@@ -420,7 +420,7 @@ async def show_search_results(message: types.Message, query: str):
             button_text = f"{i}. {title} ({duration})"
             keyboard.append([types.InlineKeyboardButton(
                 text=button_text,
-                callback_data=f"select_{video['id']}"
+                callback_data=f"select|{video['id']}"
             )])
         
         # Add cancel button
@@ -439,22 +439,22 @@ async def show_search_results(message: types.Message, query: str):
         await searching_msg.edit_text("❌ An error occurred while searching.")
 
 
-@dp.callback_query(lambda c: c.data.startswith('select_'))
+@dp.callback_query(lambda c: c.data.startswith('select|'))
 async def handle_select_callback(callback: types.CallbackQuery):
     """Handle video selection and show quality options"""
     try:
-        # Use slicing to remove 'select_' and get the full ID (handles underscores in ID)
+        # Use slicing to remove 'select|' and get the full ID
         video_id = callback.data[7:]
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         
         # Create quality options keyboard
         keyboard = [
             [
-                types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql_{video_id}_360"),
-                types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql_{video_id}_480")
+                types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql|{video_id}|360"),
+                types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql|{video_id}|480")
             ],
             [
-                types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql_{video_id}_720")
+                types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql|{video_id}|720")
             ],
             [
                 types.InlineKeyboardButton(text="🔙 Back to Search", callback_data="cancel_search")
@@ -475,19 +475,14 @@ async def handle_select_callback(callback: types.CallbackQuery):
         await callback.answer("❌ Failed to load qualities", show_alert=True)
 
 
-@dp.callback_query(lambda c: c.data.startswith('ql_'))
+@dp.callback_query(lambda c: c.data.startswith('ql|'))
 async def handle_quality_callback(callback: types.CallbackQuery):
     """Handle specific quality selection"""
     try:
-        # Remove 'ql_' prefix
-        data = callback.data[3:]
-        
-        # Split from the right to get the quality, anything before is the ID (handles underscores)
-        if '_' in data:
-            video_id, quality = data.rsplit('_', 1)
-        else:
-            video_id = data
-            quality = "720" # Default fallback
+        # Split by the new delimiter '|'
+        parts = callback.data.split('|')
+        video_id = parts[1]
+        quality = parts[2]
             
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         
@@ -837,8 +832,13 @@ async def main():
         await dp.start_polling(bot)
     except Exception as e:
         if "Conflict: terminated by other getUpdates request" in str(e):
-            logger.critical("CONFLICT ERROR: Another instance of this bot is already running!")
-            logger.critical("Please close all other terminal windows running this bot or use 'taskkill /F /IM python.exe' on Windows.")
+            print("\n" + "="*50)
+            print("CRITICAL ERROR: BOT CONFLICT DETECTED")
+            print("Another instance of this bot is already running!")
+            print("To fix this, please run the following command in your terminal:")
+            print("\ntaskkill /F /IM python.exe")
+            print("="*50 + "\n")
+            logger.critical("Conflict: Terminated by other getUpdates request")
         raise e
     finally:
         await bot.session.close()

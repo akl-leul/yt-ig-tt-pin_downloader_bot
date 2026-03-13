@@ -437,7 +437,8 @@ async def show_search_results(message: types.Message, query: str):
 async def handle_select_callback(callback: types.CallbackQuery):
     """Handle video selection and show quality options"""
     try:
-        video_id = callback.data.split('_')[1]
+        # Use slicing to remove 'select_' and get the full ID (handles underscores in ID)
+        video_id = callback.data[7:]
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         
         # Create quality options keyboard
@@ -472,10 +473,16 @@ async def handle_select_callback(callback: types.CallbackQuery):
 async def handle_quality_callback(callback: types.CallbackQuery):
     """Handle specific quality selection"""
     try:
-        parts = callback.data.split('_')
-        video_id = parts[1]
-        quality = parts[2]
+        # Remove 'ql_' prefix
+        data = callback.data[3:]
         
+        # Split from the right to get the quality, anything before is the ID (handles underscores)
+        if '_' in data:
+            video_id, quality = data.rsplit('_', 1)
+        else:
+            video_id = data
+            quality = "720" # Default fallback
+            
         video_url = f"https://www.youtube.com/watch?v={video_id}"
         
         await callback.answer(f"⬇️ Downloading in {quality}p...")

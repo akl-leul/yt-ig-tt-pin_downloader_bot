@@ -187,7 +187,13 @@ class YouTubeDownloader:
             # 1. Handle Instagram with instaloader
             if "instagram.com" in video_url:
                 try:
-                    L = instaloader.Instaloader(dirname_pattern=str(DOWNLOADS_DIR), download_video_thumbnails=False, save_metadata=False, quiet=True)
+                    L = instaloader.Instaloader(
+                        dirname_pattern=str(DOWNLOADS_DIR), 
+                        download_video_thumbnails=False, 
+                        save_metadata=False, 
+                        quiet=True,
+                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    )
                     # Extract shortcode
                     shortcode_match = re.search(r'/(?:p|reels|reel|tv)/([^/?#&]+)', video_url)
                     if shortcode_match:
@@ -528,7 +534,12 @@ async def process_video_download(message: types.Message, video_url: str, platfor
 
             if "instagram.com" in url:
                 try:
-                    L = instaloader.Instaloader(download_video_thumbnails=False, save_metadata=False, quiet=True)
+                    L = instaloader.Instaloader(
+                        download_video_thumbnails=False, 
+                        save_metadata=False, 
+                        quiet=True,
+                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    )
                     shortcode_match = re.search(r'/(?:p|reels|reel|tv)/([^/?#&]+)', url)
                     if shortcode_match:
                         post = instaloader.Post.from_shortcode(L.context, shortcode_match.group(1))
@@ -822,7 +833,15 @@ async def main():
         asyncio.create_task(start_health_server())
 
     # Start polling
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        if "Conflict: terminated by other getUpdates request" in str(e):
+            logger.critical("CONFLICT ERROR: Another instance of this bot is already running!")
+            logger.critical("Please close all other terminal windows running this bot or use 'taskkill /F /IM python.exe' on Windows.")
+        raise e
+    finally:
+        await bot.session.close()
 
 
 if __name__ == "__main__":

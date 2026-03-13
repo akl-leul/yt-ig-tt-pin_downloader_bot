@@ -831,14 +831,22 @@ async def main():
     try:
         await dp.start_polling(bot)
     except Exception as e:
-        if "Conflict: terminated by other getUpdates request" in str(e):
-            print("\n" + "="*50)
+        error_str = str(e)
+        if "Conflict: terminated by other getUpdates request" in error_str:
+            print("\n" + "!"*60)
             print("CRITICAL ERROR: BOT CONFLICT DETECTED")
-            print("Another instance of this bot is already running!")
-            print("To fix this, please run the following command in your terminal:")
-            print("\ntaskkill /F /IM python.exe")
-            print("="*50 + "\n")
+            print("Telegram says: Another instance of this bot is already running!")
+            print("\nIf you just deployed to RENDER, the bot is now running in the cloud.")
+            print("You CANNOT run it on your local PC at the same time.")
+            print("\nTO FIX THIS ON YOUR PC:")
+            print("1. Close this terminal window.")
+            print("2. If the error persists, run: taskkill /F /IM python.exe")
+            print("\nTO USE RENDER INSTEAD:")
+            print("Simply stop the local bot and let Render handle it!")
+            print("!"*60 + "\n")
             logger.critical("Conflict: Terminated by other getUpdates request")
+        else:
+            logger.error(f"Bot polling crashed: {e}")
         raise e
     finally:
         await bot.session.close()

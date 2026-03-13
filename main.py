@@ -172,7 +172,7 @@ class YouTubeDownloader:
         
         return None
 
-    async def download_video(self, video_url: str, video_info: Optional[dict] = None, progress_msg=None) -> Optional[str]:
+    async def download_video(self, video_url: str, video_info: Optional[dict] = None, progress_msg=None, target_quality: Optional[str] = None) -> Optional[str]:
         """Download video and return file path. Uses specialized libraries where requested."""
         try:
             self.current_message = progress_msg
@@ -236,18 +236,23 @@ class YouTubeDownloader:
             
             # Smart Format Selection for Size Control
             if "youtube.com" in video_url or "youtu.be" in video_url:
-                # Check size if possible
-                estimated_size = await self.check_file_size(video_url)
-                if estimated_size and estimated_size > MAX_FILE_SIZE_BYTES:
-                    # Fallback to lower resolution (480p) if 720p is too large
-                    opts['format'] = 'best[height<=480][ext=mp4]/best[ext=mp4]/best'
-                    logger.info(f"Video large ({estimated_size/1024/1024:.1f}MB), falling back to 480p")
+                if target_quality:
+                    # Use specific quality if requested
+                    opts['format'] = f'best[height<={target_quality}][ext=mp4]/best[ext=mp4]/best'
+                    logger.info(f"Downloading with target quality: {target_quality}p")
                 else:
-                    # Try 720p as default
-                    opts['format'] = 'best[height<=720][ext=mp4]/best[ext=mp4]/best'
+                    # Check size if possible for auto selection
+                    estimated_size = await self.check_file_size(video_url)
+                    if estimated_size and estimated_size > MAX_FILE_SIZE_BYTES:
+                        # Fallback to lower resolution (480p) if 720p is too large
+                        opts['format'] = 'best[height<=480][ext=mp4]/best[ext=mp4]/best'
+                        logger.info(f"Video large ({estimated_size/1024/1024:.1f}MB), falling back to 480p")
+                    else:
+                        # Try 720p as default
+                        opts['format'] = 'best[height<=720][ext=mp4]/best[ext=mp4]/best'
             
             # Check size again or for other platforms
-            estimated_size = estimated_size or await self.check_file_size(video_url)
+            estimated_size = estimated_size if (("youtube.com" in video_url or "youtu.be" in video_url) and not target_quality) else await self.check_file_size(video_url)
             if estimated_size and estimated_size > MAX_FILE_SIZE_BYTES + (5 * 1024 * 1024): # 5MB buffer
                 logger.warning(f"File likely too large: {estimated_size / (1024*1024):.1f}MB")
                 # We return None early to save bandwidth/time
@@ -335,15 +340,31 @@ async def handle_text_message(message: types.Message):
         # Determine platform for better feedback
         platform = "Video"
         if YOUTUBE_URL_PATTERN.search(url):
-            platform = "YouTube"
+            # For YouTube, show quality options first
+            video_id = YOUTUBE_URL_PATTERN.search(url).group(6)
+            keyboard = [
+                [
+                    types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql_{video_id}_360"),
+                    types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql_{video_id}_480")
+                ],
+                [
+                    types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql_{video_id}_720")
+                ]
+            ]
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=keyboard)
+            await message.answer(
+                f"🎥 <b>YouTube Video Detected</b>\n\n"
+                f"Select your preferred quality to start downloading:",
+                reply_markup=reply_markup
+            )
         elif INSTAGRAM_URL_PATTERN.search(url):
-            platform = "Instagram"
+            await process_video_download(message, url, platform="Instagram")
         elif TIKTOK_URL_PATTERN.search(url):
-            platform = "TikTok"
+            await process_video_download(message, url, platform="TikTok")
         elif PINTEREST_URL_PATTERN.search(url):
-            platform = "Pinterest"
-        
-        await process_video_download(message, url, platform=platform)
+            await process_video_download(message, url, platform="Pinterest")
+        else:
+            await process_video_download(message, url, platform="Video")
         return
 
     # Check if it's a download request from inline mode or legacy button
@@ -377,7 +398,7 @@ async def show_search_results(message: types.Message, query: str):
             button_text = f"{i}. {title} ({duration})"
             keyboard.append([types.InlineKeyboardButton(
                 text=button_text,
-                callback_data=f"download_{video['id']}_{i}"
+                callback_data=f"select_{video['id']}"
             )])
         
         # Add cancel button
@@ -396,26 +417,58 @@ async def show_search_results(message: types.Message, query: str):
         await searching_msg.edit_text("❌ An error occurred while searching.")
 
 
-@dp.callback_query(lambda c: c.data.startswith('download_'))
-async def handle_download_callback(callback: types.CallbackQuery):
-    """Handle download button clicks"""
+@dp.callback_query(lambda c: c.data.startswith('select_'))
+async def handle_select_callback(callback: types.CallbackQuery):
+    """Handle video selection and show quality options"""
     try:
-        # Parse callback data
-        parts = callback.data.split('_')
-        if len(parts) >= 3:
-            video_id = parts[1]
-            result_number = parts[2]
-            
-            # Construct video URL from ID
-            video_url = f"https://www.youtube.com/watch?v={video_id}"
-            
-            await callback.answer("⬇️ Downloading...")
-            
-            # Download the video
-            await process_video_download(callback.message, video_url, platform="YouTube")
-            
+        video_id = callback.data.split('_')[1]
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        # Create quality options keyboard
+        keyboard = [
+            [
+                types.InlineKeyboardButton(text="📺 360p (Data Saver)", callback_data=f"ql_{video_id}_360"),
+                types.InlineKeyboardButton(text="📺 480p (Standard)", callback_data=f"ql_{video_id}_480")
+            ],
+            [
+                types.InlineKeyboardButton(text="📺 720p (HD)", callback_data=f"ql_{video_id}_720")
+            ],
+            [
+                types.InlineKeyboardButton(text="🔙 Back to Search", callback_data="cancel_search")
+            ]
+        ]
+        reply_markup = types.InlineKeyboardMarkup(inline_keyboard=keyboard)
+        
+        await callback.message.edit_text(
+            "🎬 <b>Select Video Quality:</b>\n\n"
+            "Higher quality means larger file size. "
+            "Note: Files over 50MB will be automatically downscaled or aborted.",
+            reply_markup=reply_markup
+        )
+        await callback.answer()
+        
     except Exception as e:
-        logger.error(f"Error in handle_download_callback: {e}")
+        logger.error(f"Error in handle_select_callback: {e}")
+        await callback.answer("❌ Failed to load qualities", show_alert=True)
+
+
+@dp.callback_query(lambda c: c.data.startswith('ql_'))
+async def handle_quality_callback(callback: types.CallbackQuery):
+    """Handle specific quality selection"""
+    try:
+        parts = callback.data.split('_')
+        video_id = parts[1]
+        quality = parts[2]
+        
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
+        
+        await callback.answer(f"⬇️ Downloading in {quality}p...")
+        
+        # Download the video with specific quality
+        await process_video_download(callback.message, video_url, platform="YouTube", target_quality=quality)
+        
+    except Exception as e:
+        logger.error(f"Error in handle_quality_callback: {e}")
         await callback.answer("❌ Download failed", show_alert=True)
 
 
@@ -426,7 +479,7 @@ async def handle_cancel_callback(callback: types.CallbackQuery):
     await callback.answer()
 
 
-async def process_video_download(message: types.Message, video_url: str, platform: str = "Video"):
+async def process_video_download(message: types.Message, video_url: str, platform: str = "Video", target_quality: Optional[str] = None):
     """Process video download"""
     try:
         # Send downloading message
@@ -492,7 +545,7 @@ async def process_video_download(message: types.Message, video_url: str, platfor
         # Download video or handle image if no formats found
         file_path = None
         try:
-            file_path = await downloader.download_video(video_url, video_info=info, progress_msg=downloading_msg)
+            file_path = await downloader.download_video(video_url, video_info=info, progress_msg=downloading_msg, target_quality=target_quality)
         except Exception as e:
             err_msg = str(e)
             is_pinterest = "pinterest.com" in video_url or "pin.it" in video_url

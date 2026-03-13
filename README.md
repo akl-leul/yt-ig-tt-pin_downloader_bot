@@ -11,6 +11,7 @@ A powerful, asynchronous Telegram bot built with **aiogram 3** that simplifies d
 ## ✨ Key Features
 
 - 📺 **Multi-Platform Support**: Download from YouTube, Instagram (Reels/Posts), TikTok (No-Watermark), and Pinterest (Video/Image).
+- ⚙️ **Quality Selection**: Choose between 360p, 480p, and 720p for YouTube videos to manage data and file size.
 - 🔍 **Search & Download**: Send a title directly to search YouTube and get download options.
 - ⚡ **Inline Mode**: Use `@your_bot_name` in any chat to search and share videos instantly.
 - 🎨 **Progress Tracking**: Real-time progress bars and speed monitoring during downloads.

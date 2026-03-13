@@ -182,6 +182,7 @@ class YouTubeDownloader:
             self.current_message = progress_msg
             self.last_update_time = 0
             self.loop = asyncio.get_running_loop()
+            estimated_size = None
             
             # 1. Handle Instagram with instaloader
             if "instagram.com" in video_url:
@@ -533,13 +534,22 @@ async def process_video_download(message: types.Message, video_url: str, platfor
                 except: pass
 
             # 2. Fallback to yt-dlp for YouTube and others
-            opts = {'quiet': True, 'no_warnings': True, 'skip_download': True, 'nocheckcertificate': True}
+            opts = {
+                'quiet': True, 
+                'no_warnings': True, 
+                'skip_download': True, 
+                'nocheckcertificate': True,
+                'ignoreerrors': False,
+                'no_color': True,
+                'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return await asyncio.to_thread(ydl.extract_info, url, download=False)
             except Exception as e:
-                err_msg = str(e)
-                if "No video formats found" in err_msg or "Unsupported URL" in err_msg:
+                err_msg = str(e).lower()
+                # If it's a known non-video type or unsupported, handle gracefully
+                if any(x in err_msg for x in ["no video formats found", "unsupported url", "content not available"]):
                     if any(domain in url for domain in ["pinterest.com", "pin.it", "instagram.com", "tiktok.com"]):
                         return {'title': 'Social Media Content', 'url': url, 'extractor': 'fallback'}
                 raise e
